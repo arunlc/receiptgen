@@ -176,6 +176,12 @@
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
 
+        .download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .receipt {
             padding: 40px;
             background: white;
@@ -294,9 +300,9 @@
             
             <div class="form-group">
                 <label for="logo">Company Logo</label>
-                <div class="logo-upload" onclick="document.getElementById('logo').click()">
+                <div class="logo-upload" id="logoUploadArea">
                     <input type="file" id="logo" accept="image/*" style="display: none;">
-                    <div>Click to upload logo</div>
+                    <div id="logoUploadText">Click to upload logo</div>
                     <img id="logoPreview" class="logo-preview" style="display: none;">
                 </div>
             </div>
@@ -331,6 +337,11 @@
                 <textarea id="customerAddress" rows="3" placeholder="Customer Address"></textarea>
             </div>
 
+            <div class="form-group">
+                <label for="currency">Currency Symbol/Denomination</label>
+                <input type="text" id="currency" value="$" placeholder="$, €, ₹, etc.">
+            </div>
+
             <div class="items-section">
                 <h3>Items</h3>
                 <div id="itemsList">
@@ -342,12 +353,7 @@
                         <button type="button" class="remove-btn" onclick="removeItem(this)">×</button>
                     </div>
                 </div>
-                <button type="button" class="add-item-btn" onclick="addItem()">+ Add Item</button>
-            </div>
-
-            <div class="form-group">
-                <label for="currency">Currency Symbol/Denomination</label>
-                <input type="text" id="currency" value="$" placeholder="$, €, ₹, etc.">
+                <button type="button" class="add-item-btn" id="addItemBtn">+ Add Item</button>
             </div>
 
             <div class="form-group">
@@ -360,7 +366,7 @@
                 <textarea id="notes" rows="3" placeholder="Additional notes..."></textarea>
             </div>
 
-            <button class="download-btn" onclick="downloadPDF()">Download PDF Receipt</button>
+            <button class="download-btn" id="downloadBtn">Download PDF Receipt</button>
         </div>
 
         <div class="preview-section">
@@ -422,7 +428,7 @@
                     </div>
                 </div>
 
-                <div id="notesDisplay" style="margin-top: 30px; font-style: italic;"></div>
+                <div id="notesDisplay" style="margin-top: 30px; font-style: italic; display: none;"></div>
             </div>
         </div>
     </div>
@@ -430,31 +436,84 @@
     <script>
         let logoDataUrl = '';
 
-        // Set today's date as default
-        document.getElementById('receiptDate').valueAsDate = new Date();
-        
-        // Initialize preview after a short delay to ensure DOM is ready
-        setTimeout(updatePreview, 100);
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing...');
+            
+            // Set today's date as default
+            const today = new Date();
+            const dateString = today.getFullYear() + '-' + 
+                String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(today.getDate()).padStart(2, '0');
+            document.getElementById('receiptDate').value = dateString;
 
-        // Logo upload handling
-        document.getElementById('logo').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    logoDataUrl = e.target.result;
-                    document.getElementById('logoPreview').src = logoDataUrl;
-                    document.getElementById('logoPreview').style.display = 'block';
-                    document.getElementById('companyLogoDisplay').src = logoDataUrl;
-                    document.getElementById('companyLogoDisplay').style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
+            // Initialize logo upload
+            initializeLogoUpload();
+            
+            // Initialize event listeners
+            initializeEventListeners();
+            
+            // Initial preview update
+            updatePreview();
         });
 
-        // Real-time preview updates
-        document.addEventListener('input', updatePreview);
-        document.addEventListener('change', updatePreview);
+        function initializeLogoUpload() {
+            const logoUploadArea = document.getElementById('logoUploadArea');
+            const logoInput = document.getElementById('logo');
+            
+            logoUploadArea.addEventListener('click', function() {
+                logoInput.click();
+            });
+
+            logoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        logoDataUrl = e.target.result;
+                        const logoPreview = document.getElementById('logoPreview');
+                        const logoDisplay = document.getElementById('companyLogoDisplay');
+                        const uploadText = document.getElementById('logoUploadText');
+                        
+                        logoPreview.src = logoDataUrl;
+                        logoPreview.style.display = 'block';
+                        logoDisplay.src = logoDataUrl;
+                        logoDisplay.style.display = 'block';
+                        uploadText.textContent = 'Logo uploaded - click to change';
+                        
+                        console.log('Logo uploaded successfully');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        function initializeEventListeners() {
+            // Add event listeners to all form inputs
+            const inputs = document.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                input.addEventListener('input', updatePreview);
+                input.addEventListener('change', updatePreview);
+            });
+
+            // Add item button
+            document.getElementById('addItemBtn').addEventListener('click', addItem);
+
+            // Download button
+            document.getElementById('downloadBtn').addEventListener('click', downloadPDF);
+
+            // Add listeners to existing item row
+            const existingRow = document.querySelector('.item-row');
+            addItemRowListeners(existingRow);
+        }
+
+        function addItemRowListeners(row) {
+            const inputs = row.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.addEventListener('input', updatePreview);
+                input.addEventListener('change', updatePreview);
+            });
+        }
 
         function addItem() {
             const itemsList = document.getElementById('itemsList');
@@ -470,40 +529,130 @@
             itemsList.appendChild(newItem);
             
             // Add event listeners to new inputs
-            newItem.querySelectorAll('input').forEach(input => {
-                input.addEventListener('input', updatePreview);
-            });
+            addItemRowListeners(newItem);
+            updatePreview();
         }
 
         function removeItem(button) {
-            if (document.querySelectorAll('.item-row').length > 1) {
+            const itemRows = document.querySelectorAll('.item-row');
+            if (itemRows.length > 1) {
                 button.parentElement.remove();
                 updatePreview();
             }
         }
 
         function updatePreview() {
-            // Get currency symbol
-            const currency = document.getElementById('currency').value || '
+            try {
+                console.log('Updating preview...');
+                
+                // Get currency symbol
+                const currency = document.getElementById('currency').value || '$';
+                
+                // Update basic info
+                const companyName = document.getElementById('companyName').value || 'Your Company Name';
+                document.getElementById('companyNameDisplay').textContent = companyName;
+                
+                const companyAddress = document.getElementById('companyAddress').value || '123 Business St.\nCity, State 12345\nPhone: (555) 123-4567';
+                document.getElementById('companyAddressDisplay').innerHTML = companyAddress.replace(/\n/g, '<br>');
+                
+                const receiptNumber = document.getElementById('receiptNumber').value || 'REC-001';
+                document.getElementById('receiptNumberDisplay').textContent = '#' + receiptNumber;
+                
+                const dateValue = document.getElementById('receiptDate').value;
+                if (dateValue) {
+                    const date = new Date(dateValue + 'T00:00:00');
+                    document.getElementById('receiptDateDisplay').textContent = date.toLocaleDateString();
+                } else {
+                    document.getElementById('receiptDateDisplay').textContent = 'Today';
+                }
+                
+                const customerName = document.getElementById('customerName').value || 'Customer Name';
+                document.getElementById('customerNameDisplay').textContent = customerName;
+                
+                const customerAddress = document.getElementById('customerAddress').value || 'Customer Address';
+                document.getElementById('customerAddressDisplay').innerHTML = customerAddress.replace(/\n/g, '<br>');
+
+                // Update items table
+                const itemRows = document.querySelectorAll('.item-row');
+                const tableBody = document.getElementById('itemsTableBody');
+                tableBody.innerHTML = '';
+                
+                let subtotal = 0;
+                
+                itemRows.forEach(row => {
+                    const desc = row.querySelector('.item-desc').value || 'Item';
+                    const qty = parseFloat(row.querySelector('.item-qty').value) || 1;
+                    const price = parseFloat(row.querySelector('.item-price').value) || 0;
+                    const total = qty * price;
+                    
+                    // Update the total field in the form
+                    row.querySelector('.item-total').value = total.toFixed(2);
+                    
+                    subtotal += total;
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${desc}</td>
+                        <td>${qty}</td>
+                        <td>${currency}${price.toFixed(2)}</td>
+                        <td>${currency}${total.toFixed(2)}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+                
+                // Update totals
+                const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+                const tax = subtotal * (taxRate / 100);
+                const finalTotal = subtotal + tax;
+                
+                document.getElementById('subtotalDisplay').textContent = currency + subtotal.toFixed(2);
+                document.getElementById('taxDisplay').textContent = currency + tax.toFixed(2);
+                document.getElementById('totalDisplay').textContent = currency + finalTotal.toFixed(2);
+                
+                // Update notes
+                const notes = document.getElementById('notes').value;
+                const notesDisplay = document.getElementById('notesDisplay');
+                if (notes.trim()) {
+                    notesDisplay.textContent = notes;
+                    notesDisplay.style.display = 'block';
+                } else {
+                    notesDisplay.style.display = 'none';
+                }
+                
+                console.log('Preview updated successfully');
+            } catch (error) {
+                console.error('Error updating preview:', error);
+            }
+        }
 
         async function downloadPDF() {
-            const { jsPDF } = window.jspdf;
-            const receipt = document.getElementById('receiptPreview');
-            
-            // Show loading state
-            const btn = document.querySelector('.download-btn');
+            console.log('Starting PDF download...');
+            const btn = document.getElementById('downloadBtn');
             const originalText = btn.textContent;
-            btn.textContent = 'Generating PDF...';
-            btn.disabled = true;
             
             try {
+                // Show loading state
+                btn.textContent = 'Generating PDF...';
+                btn.disabled = true;
+                
+                // Check if jsPDF is loaded
+                if (typeof window.jspdf === 'undefined') {
+                    throw new Error('jsPDF library not loaded');
+                }
+                
+                const { jsPDF } = window.jspdf;
+                const receipt = document.getElementById('receiptPreview');
+                
+                console.log('Generating canvas...');
                 const canvas = await html2canvas(receipt, {
                     scale: 2,
                     useCORS: true,
                     allowTaint: true,
-                    backgroundColor: '#ffffff'
+                    backgroundColor: '#ffffff',
+                    logging: false
                 });
                 
+                console.log('Canvas generated, creating PDF...');
                 const imgData = canvas.toDataURL('image/png');
                 const pdf = new jsPDF('p', 'mm', 'a4');
                 const imgWidth = 210;
@@ -524,123 +673,19 @@
                 }
                 
                 const receiptNumber = document.getElementById('receiptNumber').value || 'REC-001';
-                pdf.save(`receipt-${receiptNumber}.pdf`);
+                const filename = `receipt-${receiptNumber}.pdf`;
+                
+                console.log('Saving PDF as:', filename);
+                pdf.save(filename);
+                
+                console.log('PDF downloaded successfully');
             } catch (error) {
                 console.error('Error generating PDF:', error);
-                alert('There was an error generating the PDF. Please try again.');
+                alert('There was an error generating the PDF. Please check the console for details and try again.');
             } finally {
                 // Reset button state
                 btn.textContent = originalText;
                 btn.disabled = false;
-            }
-        }
-    </script>
-</body>
-</html>;
-            
-            // Update basic info
-            document.getElementById('companyNameDisplay').textContent = 
-                document.getElementById('companyName').value || 'Your Company Name';
-            
-            document.getElementById('companyAddressDisplay').innerHTML = 
-                (document.getElementById('companyAddress').value || '123 Business St.\nCity, State 12345\nPhone: (555) 123-4567').replace(/\n/g, '<br>');
-            
-            document.getElementById('receiptNumberDisplay').textContent = 
-                '#' + (document.getElementById('receiptNumber').value || 'REC-001');
-            
-            const dateValue = document.getElementById('receiptDate').value;
-            document.getElementById('receiptDateDisplay').textContent = 
-                dateValue ? new Date(dateValue).toLocaleDateString() : 'Today';
-            
-            document.getElementById('customerNameDisplay').textContent = 
-                document.getElementById('customerName').value || 'Customer Name';
-            
-            document.getElementById('customerAddressDisplay').innerHTML = 
-                (document.getElementById('customerAddress').value || 'Customer Address').replace(/\n/g, '<br>');
-
-            // Update items table
-            const itemRows = document.querySelectorAll('.item-row');
-            const tableBody = document.getElementById('itemsTableBody');
-            tableBody.innerHTML = '';
-            
-            let subtotal = 0;
-            
-            itemRows.forEach(row => {
-                const desc = row.querySelector('.item-desc').value || 'Item';
-                const qty = parseFloat(row.querySelector('.item-qty').value) || 1;
-                const price = parseFloat(row.querySelector('.item-price').value) || 0;
-                const total = qty * price;
-                
-                // Update the total field in the form
-                row.querySelector('.item-total').value = total.toFixed(2);
-                
-                subtotal += total;
-                
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${desc}</td>
-                    <td>${qty}</td>
-                    <td>${currency}${price.toFixed(2)}</td>
-                    <td>${currency}${total.toFixed(2)}</td>
-                `;
-                tableBody.appendChild(tr);
-            });
-            
-            // Update totals
-            const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
-            const tax = subtotal * (taxRate / 100);
-            const total = subtotal + tax;
-            
-            document.getElementById('subtotalDisplay').textContent = currency + subtotal.toFixed(2);
-            document.getElementById('taxDisplay').textContent = currency + tax.toFixed(2);
-            document.getElementById('totalDisplay').textContent = currency + total.toFixed(2);
-            
-            // Update notes
-            const notes = document.getElementById('notes').value;
-            const notesDisplay = document.getElementById('notesDisplay');
-            if (notes) {
-                notesDisplay.textContent = notes;
-                notesDisplay.style.display = 'block';
-            } else {
-                notesDisplay.style.display = 'none';
-            }
-        }
-
-        async function downloadPDF() {
-            const { jsPDF } = window.jspdf;
-            const receipt = document.getElementById('receiptPreview');
-            
-            try {
-                const canvas = await html2canvas(receipt, {
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: true
-                });
-                
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const imgWidth = 210;
-                const pageHeight = 295;
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                let heightLeft = imgHeight;
-                
-                let position = 0;
-                
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-                
-                while (heightLeft >= 0) {
-                    position = heightLeft - imgHeight;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                }
-                
-                const receiptNumber = document.getElementById('receiptNumber').value || 'REC-001';
-                pdf.save(`receipt-${receiptNumber}.pdf`);
-            } catch (error) {
-                console.error('Error generating PDF:', error);
-                alert('There was an error generating the PDF. Please try again.');
             }
         }
     </script>
