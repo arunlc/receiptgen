@@ -346,6 +346,11 @@
             </div>
 
             <div class="form-group">
+                <label for="currency">Currency Symbol/Denomination</label>
+                <input type="text" id="currency" value="$" placeholder="$, €, ₹, etc.">
+            </div>
+
+            <div class="form-group">
                 <label for="taxRate">Tax Rate (%)</label>
                 <input type="number" id="taxRate" value="0" step="0.01" min="0">
             </div>
@@ -476,6 +481,50 @@
         }
 
         function updatePreview() {
+            // Get currency symbol
+            const currency = document.getElementById('currency').value || '
+
+        async function downloadPDF() {
+            const { jsPDF } = window.jspdf;
+            const receipt = document.getElementById('receiptPreview');
+            
+            try {
+                const canvas = await html2canvas(receipt, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const pageHeight = 295;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                
+                let position = 0;
+                
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+                
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+                
+                const receiptNumber = document.getElementById('receiptNumber').value || 'REC-001';
+                pdf.save(`receipt-${receiptNumber}.pdf`);
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                alert('There was an error generating the PDF. Please try again.');
+            }
+        }
+    </script>
+</body>
+</html>;
+            
             // Update basic info
             document.getElementById('companyNameDisplay').textContent = 
                 document.getElementById('companyName').value || 'Your Company Name';
@@ -518,8 +567,8 @@
                 tr.innerHTML = `
                     <td>${desc}</td>
                     <td>${qty}</td>
-                    <td>$${price.toFixed(2)}</td>
-                    <td>$${total.toFixed(2)}</td>
+                    <td>${currency}${price.toFixed(2)}</td>
+                    <td>${currency}${total.toFixed(2)}</td>
                 `;
                 tableBody.appendChild(tr);
             });
@@ -529,9 +578,9 @@
             const tax = subtotal * (taxRate / 100);
             const total = subtotal + tax;
             
-            document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toFixed(2);
-            document.getElementById('taxDisplay').textContent = '$' + tax.toFixed(2);
-            document.getElementById('totalDisplay').textContent = '$' + total.toFixed(2);
+            document.getElementById('subtotalDisplay').textContent = currency + subtotal.toFixed(2);
+            document.getElementById('taxDisplay').textContent = currency + tax.toFixed(2);
+            document.getElementById('totalDisplay').textContent = currency + total.toFixed(2);
             
             // Update notes
             const notes = document.getElementById('notes').value;
