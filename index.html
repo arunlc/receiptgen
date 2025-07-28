@@ -432,7 +432,9 @@
 
         // Set today's date as default
         document.getElementById('receiptDate').valueAsDate = new Date();
-        updatePreview();
+        
+        // Initialize preview after a short delay to ensure DOM is ready
+        setTimeout(updatePreview, 100);
 
         // Logo upload handling
         document.getElementById('logo').addEventListener('change', function(e) {
@@ -488,11 +490,18 @@
             const { jsPDF } = window.jspdf;
             const receipt = document.getElementById('receiptPreview');
             
+            // Show loading state
+            const btn = document.querySelector('.download-btn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Generating PDF...';
+            btn.disabled = true;
+            
             try {
                 const canvas = await html2canvas(receipt, {
                     scale: 2,
                     useCORS: true,
-                    allowTaint: true
+                    allowTaint: true,
+                    backgroundColor: '#ffffff'
                 });
                 
                 const imgData = canvas.toDataURL('image/png');
@@ -519,6 +528,10 @@
             } catch (error) {
                 console.error('Error generating PDF:', error);
                 alert('There was an error generating the PDF. Please try again.');
+            } finally {
+                // Reset button state
+                btn.textContent = originalText;
+                btn.disabled = false;
             }
         }
     </script>
